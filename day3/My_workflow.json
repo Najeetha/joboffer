@@ -1,0 +1,361 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Leave Application",
+        "formDescription": "Employee leave approval form",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "What is your name?",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Designation",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Reason for leave",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Leave from",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Leave until",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Leave type",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "CL"
+                  },
+                  {
+                    "option": "Sick Leave"
+                  },
+                  {
+                    "option": "Emergency leave"
+                  },
+                  {
+                    "option": "Planned leave"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email ID",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        20,
+        120
+      ],
+      "id": "56be6d80-ef33-489a-bf5d-7b6f2504372c",
+      "name": "On form submission",
+      "webhookId": "5c8da754-30fe-442d-b614-de511b77f1eb"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Process the following leave request:\n\n- Employee Name: {{ $json['What is your name?'] }}\n- Designation: {{ $json.Designation }}\n- Reason for Leave: {{ $json['Reason for leave'] }}\n- Leave From: {{ $json['Leave from'] }}\n- Leave Until: {{ $json['Leave until'] }}\n- Leave Type: {{ $json['Leave type'] }}\n- Submitted At: {{ $json.submittedAt }}\n- Form Mode: {{ $json.formMode }}\n- Employee Email: {{ $json['Email ID'] || 'derive from employeeName' }}\n\nEvaluate the request based on the leave approval rules, query the \"Leave eligibility\" Google Sheet for eligibility, and return a plain text response with the decision, Google Sheet update instructions, and email notification.",
+        "options": {
+          "systemMessage": "=You are an intelligent HR Leave Approval Agent. Your task is to process a leave request, query the \"Leave eligibility\" Google Sheet, check eligibility, and return a concise decision in plain text with only the essential details.\n\n**Input Fields:**\n- employeeName: String (e.g., \"Vijay\")\n- designation: String (e.g., \"HOD\")\n- reasonForLeave: String (e.g., \"going to temple\")\n- leaveFrom: Date (YYYY-MM-DD, e.g., \"2025-06-12\")\n- leaveUntil: Date (YYYY-MM-DD, e.g., \"2025-06-14\")\n- leaveType: String (e.g., \"CL\", \"SL\", \"PL\")\n- submittedAt: Timestamp (e.g., \"2025-06-11T15:46:28.120+05:30\")\n- formMode: String (e.g., \"test\")\n- employeeEmail: String (e.g., \"rsvijaysarathi123@gmail.com\") or \"derive from employeeName\"\n\n**Tasks:**\n\n1. **Validate and Calculate Days Requested:**\n   - Compute daysRequested as the inclusive difference between leaveFrom and leaveUntil (include both start and end dates).\n     - Example: leaveFrom = \"2025-06-12\", leaveUntil = \"2025-06-14\" → daysRequested = 3.\n   - Validate dates:\n     - Ensure leaveFrom and leaveUntil are in YYYY-MM-DD format and leaveUntil >= leaveFrom.\n     - If invalid, reject with decision: \"Rejected\".\n\n2. **Look Up Employee Eligibility:**\n   - Query the \"Leave eligibility\" Google Sheet using employeeEmail.\n   - If employeeEmail is \"derive from employeeName\", convert employeeName to lowercase \"firstname.lastname@example.com\" (e.g., \"Vijay\" → \"vijay@example.com\").\n   - Retrieve:\n     - eligibleCLPerMonth: Number of CL days entitled per month (assume 1 if not specified).\n     - usedCLThisMonth: Number of CL days used in the current month (based on submittedAt's month/year).\n   - If no matching employee or sheet error, reject with decision: \"Rejected\".\n\n3. **Approval Logic:**\n   - If leaveType is \"CL\":\n     - Approve only if usedCLThisMonth < 1 AND daysRequested <= 1.\n     - If approved, newUsedCL = usedCLThisMonth + daysRequested.\n     - If rejected, newUsedCL = usedCLThisMonth.\n   - If leaveType is \"SL\" or \"PL\":\n     - Always approve; newUsedCL = usedCLThisMonth.\n   - If rejected for any reason (e.g., invalid dates, eligibility lookup failure), newUsedCL = usedCLThisMonth.\n\n4. **Output Format (Plain Text):**"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        460,
+        100
+      ],
+      "id": "5af7f093-513d-48f7-8d15-c989e8ed57eb",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ],
+      "id": "1b62688c-d831-4dc8-9cdd-6afc2fdfa1ed",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "a3D3GZYN7Mw7CdlT",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1tS2IR1mefOFXB-GgWfxeG3jXeRe-uaFpC3mmzPdSmNY",
+          "mode": "list",
+          "cachedResultName": "N8N",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tS2IR1mefOFXB-GgWfxeG3jXeRe-uaFpC3mmzPdSmNY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 932336323,
+          "mode": "list",
+          "cachedResultName": "n8n-sheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1tS2IR1mefOFXB-GgWfxeG3jXeRe-uaFpC3mmzPdSmNY/edit#gid=932336323"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "What is your name?"
+          ],
+          "schema": [
+            {
+              "id": "What is your name?",
+              "displayName": "What is your name?",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Designation",
+              "displayName": "Designation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Reason for leave",
+              "displayName": "Reason for leave",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Leave from",
+              "displayName": "Leave from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Leave until",
+              "displayName": "Leave until",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Leave type",
+              "displayName": "Leave type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "submittedAt",
+              "displayName": "submittedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "formMode",
+              "displayName": "formMode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        220,
+        120
+      ],
+      "id": "2826a21c-2d1c-4a0e-a0ea-c7b3b0d42917",
+      "name": "N8N",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WYeE3srzXpUXUSLF",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('N8N').item.json['Email ID'] }}",
+        "subject": "hi",
+        "emailType": "text",
+        "message": "={{ $json.output }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        820,
+        100
+      ],
+      "id": "66b01b85-fb53-481b-9779-26b49f1d1d04",
+      "name": "Gmail",
+      "webhookId": "6e4e0188-5f28-4fa9-9cc7-d17a62c99416",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "DnkAoOCEc1KB0VMB",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1AIgGEYOdlMCWuZHL_ilae7twgHMD7wnDKXb_gPInsKc",
+          "mode": "list",
+          "cachedResultName": "Leave eligibility",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AIgGEYOdlMCWuZHL_ilae7twgHMD7wnDKXb_gPInsKc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1AIgGEYOdlMCWuZHL_ilae7twgHMD7wnDKXb_gPInsKc/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.6,
+      "position": [
+        620,
+        320
+      ],
+      "id": "f261a429-8593-453a-997f-ef6a344944dd",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "WYeE3srzXpUXUSLF",
+          "name": "Google Sheets account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "N8N",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "N8N": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "17474798-5f67-4397-bc05-f28f9486c334",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1e3489444b9c070a7a10ce9b645b4e61f3fce85f333b6053eaeee7991bee2b2a"
+  },
+  "id": "FWBBQFpnIsYXqFbF",
+  "tags": []
+}
